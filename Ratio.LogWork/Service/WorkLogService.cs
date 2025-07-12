@@ -4,28 +4,83 @@ using Ratio.LogWork.Entity;
 using Ratio.LogWork.Helpers;
 using Ratio.LogWork.Models;
 using Ratio.LogWork.Repository;
-using System.Collections.Concurrent;
+using Ratio.LogWork.Service.HandleCommands;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Ratio.LogWork.Service
 {
     public class WorkLogService : IWorkLogService
     {                               
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IWorkingProjectService _workingProjectService;
 
-        private static readonly ILogger<WorkLogService> logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<WorkLogService>();
-        
-        public WorkLogService(IUnitOfWork unitOfWork)
+        private static readonly ILogger<WorkLogService> _logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<WorkLogService>();
+        private static readonly List<string> _acceptedAction = new List<string>() { };
+
+        public WorkLogService(IUnitOfWork unitOfWork, IWorkingProjectService workingProjectService)
         {
             _unitOfWork = unitOfWork;
-        }   
-        
-        public async Task ExecuteCommand(string request, WorkingProject workingProject)
-        {                        
-            RatioCommand? requestCommand = WorkLogHelper.GetWorkingRequest(request, workingProject.Id);
+            _workingProjectService = workingProjectService;
+        }
 
-            if (request == null || requestCommand == null)
+        public QueryRequest GetQueryRequest(string command)
+        {
+            var result = new QueryRequest() { RawQuery = command };
+            var words = command.Split(' ');
+            var wordNumbers = words.Length;
+
+            if (string.IsNullOrWhiteSpace(command)) return result;
+
+            if (wordNumbers == 1)
             {
-                logger.LogError("Invalid request format: {RequestCommand}", request);
+                result.Command = words[0];
+            }
+            else if (wordNumbers == 2)
+            {
+                result.Command = words[0];
+                result.TicketId = words[1];
+            }
+            else if (wordNumbers > 3)
+            {
+                result.Command = words[0];
+                result.TicketId = words[1];
+                result.Description = string.Join(' ', words.Skip(2));
+            }
+
+            if (result.Command.Equals("project", StringComparison.OrdinalIgnoreCase))
+            {
+                result.TicketId = string.Empty;
+                result.Description = string.Empty;
+                result.ProjectName = string.Join(' ', words.Skip(1));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Handle project or task
+        /// </summary>
+        /// <param name="request"></param>
+        /// <param name="workingProject"></param>
+        /// <returns></returns>
+        public async Task ExecuteCommand(string request, WorkingProject workingProject)
+        {
+            QueryRequest queryRequest = GetQueryRequest(request);
+
+            // Handle project
+            if(queryRequest.Command.Equals("project", StringComparison.OrdinalIgnoreCase))
+            {
+                await _workingProjectService.ActiveProject(workingProject, queryRequest.ProjectName);
+                return;
+            }
+
+            // Handle task
+            RatioCommand? requestCommand = WorkLogHelper.BuildTaskRequest(queryRequest, workingProject.Id);
+
+            if (requestCommand == null)
+            {
+                _logger.LogError("Invalid request format: {RequestCommand}", request);
                 return;
             }            
 
@@ -35,108 +90,21 @@ namespace Ratio.LogWork.Service
 
                 if (taskRequest == null || taskRequest.WorkingProjectId == null)
                 {
-                    logger.LogError("Invalid task request format: {RequestCommand}", request);
+                    _logger.LogError("Invalid task request format: {RequestCommand}", request);
                     return;
                 }
 
-                var workLog = await HandleTaskCommandAsync(taskRequest);
-
-                if (workLog)
-                {
-                    Console.WriteLine($"Command '{request}' processed successfully.");
-                }
+                await HandleTaskCommandAsync(taskRequest);                
             }
         }
 
-        private async Task<bool> HandleTaskCommandAsync(WorkLogRequest request)
+        private async Task HandleTaskCommandAsync(WorkLogRequest request)
         {
-            if (request == null)
-            {
-                logger.LogError("Request is null.");
-                return false;
-            }
+            WorkLogHistoryAction historyAction = WorkLogHelper.GetHistoryActionByCommand(request.Command);
+            IHandleCommands handleCommands = new HandleCommandFactory().Create(historyAction);
 
-            // Create work log and history entry
-            var workLog = new WorkLog
-            {
-                TaskID = request.TaskID,
-                Name = request.Name,
-                Command = request.Command,
-                FullCommand = request.FullCommand,
-                StartDate = DateTime.UtcNow,
-                EndDate = DateTime.UtcNow,
-                WorkingHour = 0,
-                WorkType = request.Action,
-                Status = WorkLogStatus.Active,
-                WorkingProjectId = (int)request.WorkingProjectId
-            };
-
-            var logHistories = await BuildHistoriesRecords(request.Command, workLog);
-
-            var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
-            try
-            {
-                await strategy.ExecuteAsync(async () =>
-                {
-                    await _unitOfWork.BeginTransactionAsync();
-                    try
-                    {
-                        await _unitOfWork.GetRepository<WorkLog>().AddAsync(workLog);
-                        await _unitOfWork.GetRepository<WorkLogHistory>().AddRangeAsync(logHistories);
-                        await _unitOfWork.SaveChangesAsync();
-                        await _unitOfWork.CommitAsync();
-                    }
-                    catch
-                    {
-                        await _unitOfWork.RollbackAsync();
-                        throw;
-                    }
-                });
-                return true;
-            }
-            catch (Exception ex)
-            {
-                await _unitOfWork.RollbackAsync();
-
-                logger.LogError(ex, "Error adding work log and history entry for request: {RequestCommand}", request.FullCommand);
-                return false;
-            }
-        }        
-
-        private async Task<IEnumerable<WorkLogHistory>> BuildHistoriesRecords(string command, WorkLog newWorkLog)
-        {
-            var results = new List<WorkLogHistory>();
-            var historyAction = WorkLogHelper.GetHistoryActionByCommand(command);
-
-            // get current active
-            var currentActive = (await _unitOfWork.GetRepository<WorkLog>()
-                .FindAsync(w => w.Status == WorkLogStatus.Active &&
-                                w.WorkingProjectId == newWorkLog.WorkingProjectId))
-                .FirstOrDefault();
-
-            if (currentActive != null)
-            {
-                // move current active to pause
-                results.Add(new WorkLogHistory
-                {
-                    Action = WorkLogHistoryAction.Pause,
-                    CreatedDate = DateTime.UtcNow,
-                    WorkLogEntity = currentActive
-                });
-            }
-
-            if (historyAction == WorkLogHistoryAction.Start)
-            {
-                results.Add(new WorkLogHistory
-                {
-                    Action = historyAction,
-                    CreatedDate = DateTime.UtcNow,
-                    WorkLogEntity = newWorkLog
-                });
-            }
-
-            return results;
-        }        
+            await handleCommands.Handle(request);                
+        }               
 
         private async Task<WorkLog> CreateWorkLog(WorkLogRequest request)
         {
@@ -177,7 +145,6 @@ namespace Ratio.LogWork.Service
         public Task<WorkReportResponse> GetReports(DateTime from, DateTime to)
         {
             throw new NotImplementedException();
-        }
-        
+        }        
     }
 }

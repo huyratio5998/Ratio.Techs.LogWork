@@ -1,4 +1,5 @@
-﻿using Ratio.LogWork.Entity;
+﻿using Microsoft.EntityFrameworkCore;
+using Ratio.LogWork.Entity;
 using Ratio.LogWork.Models;
 using Ratio.LogWork.Repository;
 
@@ -21,35 +22,7 @@ namespace Ratio.LogWork.Service
         {
             var activeProject = await _unitOfWork.WorkingProjects.GetActiveProjectAsync();
 
-            if (activeProject == null)
-            {
-                var projectCommands = new List<string> { "active project", "start project", "switch project" };
-                while (true)
-                {
-                    Console.WriteLine("No active project found. Please set an active project before running the application.");
-
-                    var requestCommand = Console.ReadLine();
-
-                    if (string.IsNullOrWhiteSpace(requestCommand))
-                    {
-                        Console.WriteLine("Please enter a valid command.");
-                        continue;
-                    }
-
-                    var command = requestCommand.Split(" ")[0];
-
-                    if (projectCommands.Any(x => requestCommand.StartsWith(x)))
-                    {
-                        // Handle project commands -> would implement later                
-                        Console.WriteLine("Active project");
-                    }
-                    else
-                    {
-                        Console.WriteLine("Invalid command. Please enter a valid project command.");
-                    }
-                }
-
-            }
+            if (activeProject == null) await HandleActiveProject(activeProject);            
 
             while (true)
             {
@@ -74,6 +47,59 @@ namespace Ratio.LogWork.Service
 
                 // handle command
                 await _workLogService.ExecuteCommand(command, activeProject);
+            }
+        }
+
+        private async Task HandleActiveProject(WorkingProject activeProject)
+        {
+            while (true)
+            {
+                Console.WriteLine("No active project found. Please set an active project before running the application.");
+
+                var requestCommand = Console.ReadLine();
+
+                if (string.IsNullOrWhiteSpace(requestCommand))
+                {
+                    Console.WriteLine("Please enter a valid command.");
+                    continue;
+                }
+
+                // active project
+                var query = _workLogService.GetQueryRequest(requestCommand);
+                if (!query.Command.Equals("project", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(query.ProjectName))
+                {
+                    Console.WriteLine("Please enter a valid command.");
+                    continue;
+                }
+
+                var existedProject = await _unitOfWork.WorkingProjects
+                    .GetAll()
+                    .FirstOrDefaultAsync(x => x.Name.Equals(query.ProjectName, StringComparison.OrdinalIgnoreCase));
+
+                if (existedProject == null)
+                {
+                    await _unitOfWork.WorkingProjects.AddAsync(new WorkingProject
+                    {
+                        Name = query.ProjectName,
+                        ProjectStatus = WorkingProjectStatus.Active,
+                    });
+                    await _unitOfWork.CommitAsync();
+                }
+                else
+                {
+                    existedProject.ProjectStatus = WorkingProjectStatus.Active;
+
+                    await _unitOfWork.WorkingProjects.UpdateAsync(existedProject);
+                    await _unitOfWork.CommitAsync();
+                }
+
+                activeProject = await _unitOfWork.WorkingProjects.GetActiveProjectAsync();
+
+                if (activeProject == null)
+                {
+                    Console.WriteLine("Error when Active project. Please try again.");
+                }
+                else break;
             }
         }
 

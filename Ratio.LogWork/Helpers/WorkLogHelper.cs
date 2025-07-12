@@ -33,25 +33,41 @@ namespace Ratio.LogWork.Helpers
             return command switch
             {
                 "start" => WorkLogHistoryAction.Start,
+                "test" => WorkLogHistoryAction.Start,
+                "pr" => WorkLogHistoryAction.Start,
+                "support" => WorkLogHistoryAction.Start,
                 "pause" => WorkLogHistoryAction.Pause,
                 "continue" => WorkLogHistoryAction.Continue,
                 "done" => WorkLogHistoryAction.Done,
                 "cancel" => WorkLogHistoryAction.Cancel,
+
                 "event" => WorkLogHistoryAction.Start,
-
-                "wc" => WorkLogHistoryAction.Continue,
-                "lunch" => WorkLogHistoryAction.Continue,
-                "drink" => WorkLogHistoryAction.Continue,
-                "happy hour" => WorkLogHistoryAction.Continue,
-                "home" => WorkLogHistoryAction.Continue,
-                "off" => WorkLogHistoryAction.Continue,
-
-                "meeting" => WorkLogHistoryAction.Continue,
-                "test" => WorkLogHistoryAction.Continue,
-                "pr" => WorkLogHistoryAction.Continue,
-                "support" => WorkLogHistoryAction.Continue,
+                "wc" => WorkLogHistoryAction.Start,
+                "lunch" => WorkLogHistoryAction.Start,
+                "drink" => WorkLogHistoryAction.Start,
+                "happy hour" => WorkLogHistoryAction.Start,
+                "home" => WorkLogHistoryAction.Start,
+                "off" => WorkLogHistoryAction.Start,
+                "meeting" => WorkLogHistoryAction.Start,
 
                 _ => WorkLogHistoryAction.NoAction
+            };
+        }
+
+        public static WorkLog MapWorkLog(WorkLogRequest workLogRequest)
+        {
+            return new WorkLog
+            {
+                TaskID = workLogRequest.TaskID,
+                Name = workLogRequest.Name,
+                Command = workLogRequest.Command,
+                FullCommand = workLogRequest.FullCommand,
+                StartDate = DateTime.UtcNow,
+                EndDate = DateTime.UtcNow,
+                WorkingHour = 0,
+                WorkType = workLogRequest.Action,
+                Status = WorkLogStatus.Active,
+                WorkingProjectId = (int)workLogRequest.WorkingProjectId
             };
         }
 
@@ -77,58 +93,26 @@ namespace Ratio.LogWork.Helpers
                 "happy hour" => WorkLogType.Other,
                 _ => WorkLogType.Other
             };
-        }
+        }        
 
-        public static RatioCommand? GetWorkingRequest(string requestCommand, int activeProjectId)
+        public static WorkLogRequest? BuildTaskRequest(QueryRequest queryRequest, int activeProjectId)
         {
-            var projectCommands = new List<string> { "active project", "start project", "switch project" };
-
-            if (string.IsNullOrWhiteSpace(requestCommand))
+            if (!_listCommandAcceptable.Contains(queryRequest.Command, StringComparer.OrdinalIgnoreCase))
             {
-                _logger.LogError("Request command is null or empty.");
+                _logger.LogError("Invalid command: {Command}", queryRequest.Command);
                 return null;
             }
 
-            var command = requestCommand.Split(" ")[0];
-
-            if (projectCommands.Any(x => requestCommand.StartsWith(x)))
-            {
-                // Handle project commands                
-                return new RatioCommand
-                {
-                    CommandType = RatioCommandType.Project,
-                    Command = command,
-                    FullCommand = requestCommand
-                };
-            }
-
-            var firstSpaceIndex = requestCommand.IndexOf(' ');
-            var data = (firstSpaceIndex >= 0 && firstSpaceIndex < requestCommand.Length - 1)
-                ? requestCommand.Substring(firstSpaceIndex + 1)
-                : string.Empty;
-
-            return BuildTaskRequest(command, data, activeProjectId);
-        }
-
-        public static WorkLogRequest? BuildTaskRequest(string command, string data, int activeProjectId)
-        {
-            if (!_listCommandAcceptable.Contains(command, StringComparer.OrdinalIgnoreCase))
-            {
-                _logger.LogError("Invalid command: {Command}", command);
-                return null;
-            }
-
-            var workAction = WorkLogHelper.GetWorkActionByCommand(command);
-            var taskId = data.Split("-")[0] ?? string.Empty;
+            var workAction = GetWorkActionByCommand(queryRequest.Command);            
             WorkLogRequest request = new WorkLogRequest
             {
+                WorkingProjectId = activeProjectId,
                 CommandType = RatioCommandType.Task,
-                Command = command,
-                FullCommand = $"{command} {data}",
+                Command = queryRequest.Command,
                 Action = workAction,
-                TaskID = taskId,
-                Name = GetWorkDisplayName(workAction, taskId, data.Split("-").Length > 1 ? data.Split("-")[1] : string.Empty),
-                WorkingProjectId = activeProjectId
+                FullCommand = queryRequest.RawQuery,
+                TaskID = queryRequest.TicketId,
+                Name = GetWorkDisplayName(workAction, queryRequest.TicketId, queryRequest.Description),
             };
 
             return request;
