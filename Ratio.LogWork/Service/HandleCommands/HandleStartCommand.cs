@@ -19,8 +19,14 @@ namespace Ratio.LogWork.Service.HandleCommands
 
         public async Task Handle(WorkLogRequest workLogRequest)
         {            
-            var workLog = WorkLogHelper.MapWorkLog(workLogRequest);
-            var logHistories = await GetHistoriesLogs(workLog);
+            var workLog = WorkLogHelper.MapWorkLog(workLogRequest);            
+
+            var currentActiveTask = await _unitOfWork.GetRepository<WorkLog>()
+                .GetAll()
+                .FirstOrDefaultAsync(w =>
+                    w.Status == WorkLogStatus.Active && w.WorkingProjectId == workLogRequest.WorkingProjectId);
+
+            var logHistories = await GetHistoriesLogs(workLog, currentActiveTask);
 
             // Start add to DB in a transaction
             var strategy = _unitOfWork.Context.Database.CreateExecutionStrategy();
@@ -33,6 +39,13 @@ namespace Ratio.LogWork.Service.HandleCommands
                     {
                         await _unitOfWork.GetRepository<WorkLog>().AddAsync(workLog);
                         await _unitOfWork.GetRepository<WorkLogHistory>().AddRangeAsync(logHistories);
+
+                        if (currentActiveTask != null)
+                        {
+                            currentActiveTask.Status = WorkLogStatus.Paused;
+                            await _unitOfWork.GetRepository<WorkLog>().UpdateAsync(currentActiveTask);
+                        }
+
                         await _unitOfWork.SaveChangesAsync();
                         await _unitOfWork.CommitAsync();
                     }
@@ -46,33 +59,24 @@ namespace Ratio.LogWork.Service.HandleCommands
             }
             catch (Exception ex)
             {
-                await _unitOfWork.RollbackAsync();
-
-                _logger.LogError(ex, "Error adding work log and history entry for request: {RequestCommand}", workLogRequest.FullCommand);
+                _logger.LogError(ex, "Error adding work log and history entry for request: {RequestCommand}", workLogRequest.FullCommand);                                
                 return;
             }
         }
 
-        private async Task<IEnumerable<WorkLogHistory>> GetHistoriesLogs(WorkLog newWorkLog)
+        private async Task<IEnumerable<WorkLogHistory>> GetHistoriesLogs(WorkLog newWorkLog, WorkLog? currentActiveTask)
         {
-            var results = new List<WorkLogHistory>();
+            var results = new List<WorkLogHistory>();            
 
-            // Make sure only 1 task active at a time.
-            // Get current active work
-            var currentActive = await _unitOfWork.GetRepository<WorkLog>()
-                .GetAll()
-                .FirstOrDefaultAsync(w =>
-                    w.Status == WorkLogStatus.Active && w.WorkingProjectId == newWorkLog.WorkingProjectId);
-
-            if (currentActive != null)
+            if (currentActiveTask != null)
             {
                 // Pause current active
                 results.Add(new WorkLogHistory
                 {
                     Action = WorkLogHistoryAction.Pause,
                     CreatedDate = DateTime.UtcNow,
-                    WorkLogId = currentActive.Id,
-                    WorkLogEntity = currentActive
+                    WorkLogId = currentActiveTask.Id,
+                    WorkLogEntity = currentActiveTask
                 });
             }
 

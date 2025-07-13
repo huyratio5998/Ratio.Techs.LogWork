@@ -37,7 +37,7 @@ namespace Ratio.LogWork.Service
 
                         var newProject = workingProjectRepository
                         .GetAll()
-                        .FirstOrDefault(x => x.Name.Equals(newProjectName, StringComparison.OrdinalIgnoreCase));
+                        .FirstOrDefault(x => x.Name.ToLower().Equals(newProjectName.ToLower()));
 
                         // Active new project: Add or update
                         if (newProject == null)
@@ -67,9 +67,7 @@ namespace Ratio.LogWork.Service
             }
             catch (Exception ex)
             {
-                await _unitOfWork.RollbackAsync();
-
-                _logger.LogError(ex, "Error when active projet: {0}", newProjectName);
+                _logger.LogError(ex, "Error when active projet: {0}", newProjectName);                                
                 return;
             }
         }

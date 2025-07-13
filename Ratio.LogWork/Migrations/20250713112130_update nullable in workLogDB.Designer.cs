@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Ratio.LogWork.Context;
 
@@ -11,9 +12,11 @@ using Ratio.LogWork.Context;
 namespace Ratio.LogWork.Migrations
 {
     [DbContext(typeof(WorkLogDBContext))]
-    partial class WorkLogDBContextModelSnapshot : ModelSnapshot
+    [Migration("20250713112130_update nullable in workLogDB")]
+    partial class updatenullableinworkLogDB
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

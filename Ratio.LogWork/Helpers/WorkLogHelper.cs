@@ -33,13 +33,14 @@ namespace Ratio.LogWork.Helpers
             return command switch
             {
                 "start" => WorkLogHistoryAction.Start,
-                "test" => WorkLogHistoryAction.Start,
-                "pr" => WorkLogHistoryAction.Start,
-                "support" => WorkLogHistoryAction.Start,
                 "pause" => WorkLogHistoryAction.Pause,
                 "continue" => WorkLogHistoryAction.Continue,
                 "done" => WorkLogHistoryAction.Done,
                 "cancel" => WorkLogHistoryAction.Cancel,
+                "test" => WorkLogHistoryAction.Start,
+                "pr" => WorkLogHistoryAction.Start,
+                "support" => WorkLogHistoryAction.Start,
+                "meeting" => WorkLogHistoryAction.Start,
 
                 "event" => WorkLogHistoryAction.Start,
                 "wc" => WorkLogHistoryAction.Start,
@@ -48,7 +49,6 @@ namespace Ratio.LogWork.Helpers
                 "happy hour" => WorkLogHistoryAction.Start,
                 "home" => WorkLogHistoryAction.Start,
                 "off" => WorkLogHistoryAction.Start,
-                "meeting" => WorkLogHistoryAction.Start,
 
                 _ => WorkLogHistoryAction.NoAction
             };
@@ -69,6 +69,45 @@ namespace Ratio.LogWork.Helpers
                 Status = WorkLogStatus.Active,
                 WorkingProjectId = (int)workLogRequest.WorkingProjectId
             };
+        }
+
+        public static double CalculateWorkingHour(List<WorkLogHistory> workLogHistories)
+        {           
+            if (!workLogHistories.Any()) return 0;
+
+            workLogHistories = workLogHistories.OrderBy(x=>x.CreatedDate).ToList();
+
+            double totalMinutes = 0;
+            DateTime? startTime = null;
+            foreach (var item in workLogHistories)
+            {
+                switch (item.Action)
+                {
+                    case WorkLogHistoryAction.Start:
+                    case WorkLogHistoryAction.Continue:
+                        // Begin timing
+                        startTime = item.CreatedDate;
+                        break;
+
+                    case WorkLogHistoryAction.Pause:
+                    case WorkLogHistoryAction.Done:
+                    case WorkLogHistoryAction.Cancel:
+                        // End timing and accumulate
+                        if (startTime.HasValue)
+                        {
+                            totalMinutes += (item.CreatedDate - startTime.Value).TotalMinutes;
+                            startTime = null;
+                        }
+                        break;
+
+                    case WorkLogHistoryAction.NoAction:
+                    default:
+                        // No timing change for these actions
+                        break;
+                }
+            }
+
+            return totalMinutes / 60;            
         }
 
         public static WorkLogType GetWorkActionByCommand(string command)

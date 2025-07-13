@@ -28,6 +28,7 @@ namespace Ratio.LogWork.Configurations
             services.AddScoped<IApplicationService, ApplicationService>();
             services.AddScoped<IReportService, ReportService>();
             services.AddScoped<IWorkLogService, WorkLogService>();
+            services.AddScoped<IWorkingProjectService, WorkingProjectService>();
 
             return services;
         }

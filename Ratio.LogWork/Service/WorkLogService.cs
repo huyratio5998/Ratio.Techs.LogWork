@@ -1,12 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Ratio.LogWork.Entity;
 using Ratio.LogWork.Helpers;
 using Ratio.LogWork.Models;
 using Ratio.LogWork.Repository;
 using Ratio.LogWork.Service.HandleCommands;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Ratio.LogWork.Service
 {
@@ -15,8 +12,7 @@ namespace Ratio.LogWork.Service
         private readonly IUnitOfWork _unitOfWork;
         private readonly IWorkingProjectService _workingProjectService;
 
-        private static readonly ILogger<WorkLogService> _logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<WorkLogService>();
-        private static readonly List<string> _acceptedAction = new List<string>() { };
+        private static readonly ILogger<WorkLogService> _logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<WorkLogService>();        
 
         public WorkLogService(IUnitOfWork unitOfWork, IWorkingProjectService workingProjectService)
         {
@@ -101,40 +97,10 @@ namespace Ratio.LogWork.Service
         private async Task HandleTaskCommandAsync(WorkLogRequest request)
         {
             WorkLogHistoryAction historyAction = WorkLogHelper.GetHistoryActionByCommand(request.Command);
-            IHandleCommands handleCommands = new HandleCommandFactory().Create(historyAction);
+            IHandleCommands handleCommands = new HandleCommandFactory(_unitOfWork).Create(historyAction);
 
             await handleCommands.Handle(request);                
-        }               
-
-        private async Task<WorkLog> CreateWorkLog(WorkLogRequest request)
-        {
-            // Look for an existing work log with the same TaskID
-            var workLogRepository = _unitOfWork.GetRepository<WorkLog>();
-            var existingWorkLog = (await workLogRepository.FindAsync(w =>
-                w.TaskID == request.TaskID && w.WorkingProjectId == request.WorkingProjectId))
-                .FirstOrDefault();
-
-            if (existingWorkLog != null)
-                return existingWorkLog;
-
-            // Create new work log if not found
-            var workLog = new WorkLog
-            {
-                TaskID = request.TaskID,
-                Name = request.Name,
-                Command = request.Command,
-                FullCommand = request.FullCommand,
-                StartDate = DateTime.UtcNow,
-                EndDate = DateTime.UtcNow,
-                WorkingHour = 0,
-                WorkType = request.Action,
-                Status = WorkLogStatus.Active,
-                WorkingProjectId = (int)request.WorkingProjectId
-            };
-
-            await workLogRepository.AddAsync(workLog);
-            return workLog;
-        }
+        }                       
         
         // not implement
         public Task<WorkReportResponse> GetReport(DateTime reportDate)

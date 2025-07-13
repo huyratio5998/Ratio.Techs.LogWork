@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Ratio.LogWork.Entity;
-using Ratio.LogWork.Models;
 using Ratio.LogWork.Repository;
+using Ratio.LogWork.Service.SimpleAutoComplete;
 
 namespace Ratio.LogWork.Service
 {
@@ -22,13 +22,19 @@ namespace Ratio.LogWork.Service
         {
             var activeProject = await _unitOfWork.WorkingProjects.GetActiveProjectAsync();
 
-            if (activeProject == null) await HandleActiveProject(activeProject);            
+            if (activeProject == null) await HandleActiveProject(activeProject);
 
             while (true)
             {
-                InitDisplay(activeProject);
+                await InitDisplay(activeProject);
 
-                var command = Console.ReadLine();
+                ReadLine.HistoryEnabled = true;
+                ReadLine.AutoCompletionHandler = new LogWorkAutoCompleteHandler(new[]
+                {
+                    "test", "pr", "support", "meeting", "start", "pause", "continue", "cancel", "done",
+                    "wc", "lunch", "drink", "happy hour", "event", "off", "home"
+                });                
+                var command = ReadLine.Read();
 
                 // Validate command
                 if (string.IsNullOrWhiteSpace(command))
@@ -103,20 +109,64 @@ namespace Ratio.LogWork.Service
             }
         }
 
-        private static void InitDisplay(WorkingProject? activeProject)
+        private async Task InitDisplay(WorkingProject? activeProject)
         {
-            Console.WriteLine("Welcome to Ratio Log Work Service!");
+            Console.Clear();
+            Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+            Console.WriteLine($"RATIO-TECHS:WORK-LOGS {DateTime.Now.ToString("D")}");
+            Console.WriteLine();
 
             if (activeProject == null)
             {
                 Console.WriteLine("No project is active");
+                return;
+            }
+
+            List<WorkLog>? displayTopRecentTasks = new List<WorkLog>();
+            int maximumTaskDisplay = 5;
+            displayTopRecentTasks = await _unitOfWork.GetRepository<WorkLog>()
+                .GetAll()
+                .Where(x => x.Status == WorkLogStatus.Active)
+                .OrderByDescending(x => x.CreatedDate)
+                .Take(maximumTaskDisplay)
+                .ToListAsync();
+
+            if (!displayTopRecentTasks.Any() || displayTopRecentTasks.Count < maximumTaskDisplay)
+            {
+                var remainSlot = maximumTaskDisplay - displayTopRecentTasks.Count;
+                displayTopRecentTasks.AddRange(
+                    await _unitOfWork.GetRepository<WorkLog>()
+                    .GetAll()
+                    .Where(x => x.Status == WorkLogStatus.Paused)
+                    .OrderByDescending(x => x.CreatedDate)
+                    .Take(remainSlot)
+                    .ToListAsync()
+                );
+            }
+
+            displayTopRecentTasks = displayTopRecentTasks.OrderBy(x => x.CreatedDate).ToList();
+
+            Console.WriteLine($"---------------------- ACTIVE-PROJECT:[{activeProject.Name.ToUpperInvariant()}]----------------------");
+            Console.WriteLine();
+
+            if (displayTopRecentTasks.Any())
+            {
+                Console.WriteLine("Recent tasks:");
+                foreach (var item in displayTopRecentTasks)
+                {
+                    Console.WriteLine($"[{item.Status.ToString().ToUpperInvariant()}]{item.Name}]");
+                }
             }
             else
             {
-                Console.WriteLine($"Working project: {activeProject.Name.ToUpperInvariant()}");
+                Console.WriteLine("No task need to do");
             }
-            Console.WriteLine("Command pattern: {command} {ticketId}-{descriptions}");
-            Console.Write("Command: ");
+
+            Console.WriteLine();
+            Console.WriteLine("🖥️ Task-Action: Test, PR, Support, Meeting, Start, Pause, Continue, Cancel, Done");
+            Console.WriteLine("💼 Others-Action: WC, Lunch, Drink, Happy hour, Event, Off, Home:go home");
+            Console.WriteLine("⌨️ Your commands \"{Action} {Task} {Description}\":");
         }
     }
 }

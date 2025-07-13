@@ -3,9 +3,9 @@
     public class WorkLog : BaseEntity
     {
         public string Command { get; set; }
-        public string Name { get; set; }
+        public string? Name { get; set; }
         public string FullCommand { get; set; }
-        public string TaskID { get; set; }
+        public string? TaskID { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public double WorkingHour { get; set; }
