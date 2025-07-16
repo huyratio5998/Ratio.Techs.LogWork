@@ -26,8 +26,8 @@
         GoHome = 4,
         Event = 5,
         OnLeave = 6,
-        Other = 7,
-
+        Report = 7,
+        Other = 8,
     }
 
     public enum WorkLogStatus

@@ -23,7 +23,7 @@ namespace Ratio.LogWork.Service
         public QueryRequest GetQueryRequest(string command)
         {
             var result = new QueryRequest() { RawQuery = command };
-            var words = command.Split(' ');
+            var words = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var wordNumbers = words.Length;
 
             if (string.IsNullOrWhiteSpace(command)) return result;
@@ -37,7 +37,7 @@ namespace Ratio.LogWork.Service
                 result.Command = words[0];
                 result.TicketId = words[1];
             }
-            else if (wordNumbers > 3)
+            else if (wordNumbers >= 3)
             {
                 result.Command = words[0];
                 result.TicketId = words[1];
@@ -97,7 +97,7 @@ namespace Ratio.LogWork.Service
         private async Task HandleTaskCommandAsync(WorkLogRequest request)
         {
             WorkLogHistoryAction historyAction = WorkLogHelper.GetHistoryActionByCommand(request.Command);
-            IHandleCommands handleCommands = new HandleCommandFactory(_unitOfWork).Create(historyAction);
+            IHandleCommands handleCommands = new HandleCommandFactory(_unitOfWork).Create(historyAction, request.Command);
 
             await handleCommands.Handle(request);                
         }                       

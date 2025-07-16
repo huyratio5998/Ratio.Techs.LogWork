@@ -76,9 +76,10 @@ namespace Ratio.LogWork.Service.HandleCommands
 
                         // Update workLog: status and time:
                         var workLogHistories = await _unitOfWork.GetRepository<WorkLogHistory>().FindAsync(x => x.WorkLogId == taskNeedPause.Id);
+                        var allHistories = workLogHistories.Concat(logHistories).ToList();
 
                         taskNeedPause.Status = WorkLogStatus.Paused;
-                        taskNeedPause.WorkingHour = WorkLogHelper.CalculateWorkingHour(workLogHistories.ToList());
+                        taskNeedPause.WorkingHour = WorkLogHelper.CalculateWorkingHour(allHistories);
 
                         await _unitOfWork.GetRepository<WorkLog>().UpdateAsync(taskNeedPause);
 

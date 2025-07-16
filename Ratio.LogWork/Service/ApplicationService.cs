@@ -32,7 +32,8 @@ namespace Ratio.LogWork.Service
                 ReadLine.AutoCompletionHandler = new LogWorkAutoCompleteHandler(new[]
                 {
                     "test", "pr", "support", "meeting", "start", "pause", "continue", "cancel", "done",
-                    "wc", "lunch", "drink", "happy hour", "event", "off", "home"
+                    "wc", "lunch", "drink", "happy hour", "event", "off", "home",
+                    "show", "report"
                 });                
                 var command = ReadLine.Read();
 
@@ -114,12 +115,15 @@ namespace Ratio.LogWork.Service
             Console.Clear();
             Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-            Console.WriteLine($"RATIO-TECHS:WORK-LOGS {DateTime.Now.ToString("D")}");
-            Console.WriteLine();
+            var sb = new System.Text.StringBuilder();
+
+            sb.AppendLine($"RATIO-TECHS:WORK-LOGS {DateTime.Now:D}");
+            sb.AppendLine();
 
             if (activeProject == null)
             {
-                Console.WriteLine("No project is active");
+                sb.AppendLine("No project is active");
+                Console.WriteLine(sb.ToString());
                 return;
             }
 
@@ -147,26 +151,29 @@ namespace Ratio.LogWork.Service
 
             displayTopRecentTasks = displayTopRecentTasks.OrderBy(x => x.CreatedDate).ToList();
 
-            Console.WriteLine($"---------------------- ACTIVE-PROJECT:[{activeProject.Name.ToUpperInvariant()}]----------------------");
-            Console.WriteLine();
+            sb.AppendLine($"---------------------- ACTIVE-PROJECT:[{activeProject.Name.ToUpperInvariant()}]----------------------");
+            sb.AppendLine();
 
             if (displayTopRecentTasks.Any())
             {
-                Console.WriteLine("Recent tasks:");
+                sb.AppendLine("Recent tasks:");
                 foreach (var item in displayTopRecentTasks)
                 {
-                    Console.WriteLine($"[{item.Status.ToString().ToUpperInvariant()}]{item.Name}]");
+                    sb.AppendLine($"[{item.Status.ToString().ToUpperInvariant()}]{item.Name}]");
                 }
             }
             else
             {
-                Console.WriteLine("No task need to do");
+                sb.AppendLine("No task need to do");
             }
 
-            Console.WriteLine();
-            Console.WriteLine("🖥️ Task-Action: Test, PR, Support, Meeting, Start, Pause, Continue, Cancel, Done");
-            Console.WriteLine("💼 Others-Action: WC, Lunch, Drink, Happy hour, Event, Off, Home:go home");
-            Console.WriteLine("⌨️ Your commands \"{Action} {Task} {Description}\":");
+            sb.AppendLine();
+            sb.AppendLine("🖥️ Task-Action: Test, PR, Support, Meeting, Start, Pause, Continue, Cancel, Done");
+            sb.AppendLine("💼 Others-Action: WC, Lunch, Drink, Happy hour, Event, Off, Home:go home");
+            sb.AppendLine("🚀 Display-Action: Show, Report");
+            sb.AppendLine("⌨️ Your commands \"{Action} {Task} {Description}\":");
+
+            Console.Write(sb.ToString());
         }
     }
 }

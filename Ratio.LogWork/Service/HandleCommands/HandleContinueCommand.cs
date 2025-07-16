@@ -94,9 +94,10 @@ namespace Ratio.LogWork.Service.HandleCommands
                         if (currentActiveTask != null && currentActiveTask.Id != taskNeedContinue.Id)
                         {
                             var workLogHistories = await _unitOfWork.GetRepository<WorkLogHistory>().FindAsync(x => x.WorkLogId == currentActiveTask.Id);
+                            var allHistories = workLogHistories.Concat(logHistories).ToList();
 
                             currentActiveTask.Status = WorkLogStatus.Paused;
-                            currentActiveTask.WorkingHour = WorkLogHelper.CalculateWorkingHour(workLogHistories.ToList());
+                            currentActiveTask.WorkingHour = WorkLogHelper.CalculateWorkingHour(allHistories);
                             await _unitOfWork.GetRepository<WorkLog>().UpdateAsync(currentActiveTask);
                         }
 
