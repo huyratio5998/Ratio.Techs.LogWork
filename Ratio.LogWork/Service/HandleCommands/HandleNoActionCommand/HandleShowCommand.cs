@@ -4,7 +4,6 @@ using Ratio.LogWork.Entity;
 using Ratio.LogWork.Helpers;
 using Ratio.LogWork.Models;
 using Ratio.LogWork.Repository;
-using System.Net.WebSockets;
 
 namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
 {
@@ -14,6 +13,12 @@ namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
         {
         }
 
+        /// <summary>
+        /// Show tasks.
+        /// Eg: show 123,234,555
+        /// </summary>
+        /// <param name="workLogRequest"></param>
+        /// <returns></returns>
         public override async Task Handle(WorkLogRequest workLogRequest)
         {
             if (workLogRequest == null || string.IsNullOrWhiteSpace(workLogRequest.TaskID))
@@ -31,7 +36,7 @@ namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
 
             var tickets = ticketPart.Trim().Split(",", StringSplitOptions.RemoveEmptyEntries)
                 .Select(x => x.Trim())
-                .Where(x => !string.IsNullOrWhiteSpace(x))                
+                .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToArray();
 
             List<WorkLog> displayItems = new List<WorkLog>();
@@ -52,7 +57,7 @@ namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
                 {
                     DisplayError(workLogRequest);
                     return;
-                }                
+                }
 
                 displayItems.AddRange(workLogs);
                 Display(displayItems, workLogRequest);
@@ -74,7 +79,7 @@ namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
                 displayItems.AddRange(workLogs);
                 Display(displayItems, workLogRequest);
             }
-            
+
             return;
         }
 
@@ -89,7 +94,7 @@ namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
                 return;
             }
 
-            _logger.LogInformation("Task not found. Command {requestCommand}", workLogRequest.FullCommand);            
+            _logger.LogInformation("Task not found. Command {requestCommand}", workLogRequest.FullCommand);
             Console.WriteLine($"{err}. Command {workLogRequest.TaskID}");
 
             KeepDisplayResult();
@@ -110,7 +115,7 @@ namespace Ratio.LogWork.Service.HandleCommands.HandleNoActionCommand
             var sb = new System.Text.StringBuilder();
             foreach (var item in workLogs.OrderBy(x => x.TaskID).ThenBy(x => x.CreatedDate))
             {
-                sb.AppendLine($"[{item.Status}]{item.Name.SanitizeName()}");
+                sb.AppendLine($"[{item.Status}][{WorkLogHelper.GetWorkLogIdDisplay(item)}]{item.Name.SanitizeName()}");
                 sb.AppendLine($"⏳ Time: {item.WorkingHour.GetTimeDisplay()}");
                 sb.AppendLine($"🏃 Start: {item.CreatedDate:yyyy-MM-dd HH:mm}");
                 string currentStatus = item.Status == WorkLogStatus.Done ? "✅ Finish" : $"⚒️ {item.Status.ToString()}";

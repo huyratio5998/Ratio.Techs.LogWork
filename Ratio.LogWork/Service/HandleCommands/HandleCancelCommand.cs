@@ -69,7 +69,7 @@ namespace Ratio.LogWork.Service.HandleCommands
                         var allHistories = workLogHistories.Concat(logHistories).ToList();
 
                         taskNeedCancel.Status = WorkLogStatus.Cancelled;
-                        taskNeedCancel.EndDate = DateTime.Now;
+                        taskNeedCancel.EndDate = DateTime.UtcNow;
                         taskNeedCancel.WorkingHour = WorkLogHelper.CalculateWorkingHour(allHistories);
 
                         await _unitOfWork.GetRepository<WorkLog>().UpdateAsync(taskNeedCancel);

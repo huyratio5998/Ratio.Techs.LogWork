@@ -40,6 +40,8 @@ namespace Ratio.LogWork.Service.HandleCommands
                             result = new HandleShowCommand(_unitOfWork);
                         else if (command.Equals(WorkLogHelper.REPORT, StringComparison.OrdinalIgnoreCase))
                             result = new HandleReportCommand(_unitOfWork);
+                        else if (command.Equals(WorkLogHelper.EDIT, StringComparison.OrdinalIgnoreCase))
+                            result = new HandleReportCommand(_unitOfWork);
                         else
                             result = new HandleDoNothingCommand(_unitOfWork);
                         break;

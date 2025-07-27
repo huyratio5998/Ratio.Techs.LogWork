@@ -26,6 +26,7 @@ namespace Ratio.LogWork.Helpers
         public const string SUPPORT = "support";
         public const string REPORT = "report";
         public const string SHOW = "show";
+        public const string EDIT = "edit";
 
         //
         public static readonly List<string> _listCommandAcceptable =
@@ -33,7 +34,8 @@ namespace Ratio.LogWork.Helpers
             START, PAUSE, CONTINUE, DONE, CANCEL, EVENT,
             WC, LUNCH, DRINK, HAPPY_HOUR, HOME, OFF,
             MEETING, TEST, PR, SUPPORT,
-            REPORT, SHOW
+            REPORT, SHOW,
+            EDIT
         };
 
         private static readonly ILogger<WorkLogService> _logger = LoggerFactory.Create(builder => builder.AddConsole()).CreateLogger<WorkLogService>();
@@ -235,6 +237,14 @@ namespace Ratio.LogWork.Helpers
             if (seconds > 0 || parts.Count == 0) parts.Add($"{seconds}s");
 
             return string.Join(" ", parts);
+        }
+
+        public static string GetWorkLogIdDisplay(WorkLog workLog)
+        {
+            const string WORK_LOG_PREFIX_CODE = "R";
+            if (workLog == null) return string.Empty;
+
+            return $"{WORK_LOG_PREFIX_CODE}{workLog.Id}";
         }
     }
 }
